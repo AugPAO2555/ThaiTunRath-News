@@ -12,21 +12,26 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Sync คำสั่งทั้งหมดให้ใช้งานได้ทันที
         await self.tree.sync()
         print(f"✅ บอทออนไลน์แล้วในชื่อ: {self.user}")
 
 bot = MyBot()
 
+# สีประจำบอท (เขียวเข้มเดียวกับ News)
+BOT_COLOR = discord.Color.dark_green()
+
 # --- ระบบจัดการ Error สำหรับ Admin ---
 async def admin_error_handler(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
         if not interaction.response.is_done():
-            await interaction.response.send_message("❌ **ขออภัยคั้บ!** เฉพาะ Admin เท่านั้นที่ใช้ได้", ephemeral=True)
+            await interaction.response.send_message("❌ เฉพาะ Admin เท่านั้นที่ใช้ได้คั้บ", ephemeral=True)
 
 # --- 1. คำสั่ง /help ---
 @bot.tree.command(name="help", description="ดูคำสั่งทั้งหมด")
 async def help_command(interaction: discord.Interaction):
+    # Defer แบบเงียบ (เห็นแค่คนกด) เพื่อปิดช่องโหว่เรื่องแถบชื่อ
+    await interaction.response.defer(ephemeral=True)
+    
     embed = discord.Embed(
         title="_ _",
         description=(
@@ -36,44 +41,54 @@ async def help_command(interaction: discord.Interaction):
             "* เริ่มที่คำสั่งหลักกันคั้บ !!\n"
             "- -# คำสั่ง - รายละเอียด\n\n"
             "**• /embed** - สร้างข้อความแบบ Embed\n"
-            "**• /image** - ลงภาพข่าวสีเขียวเข้ม\n"
+            "**• /image** - ลงภาพข่าว (สีประจำบอท)\n"
             "**• /news** - สร้างข่าวรูปแบบ THAITUNRATH\n"
             "**• /ping** - ประกาศแจ้งเตือนทุกคน"
         ),
-        color=discord.Color.blue()
+        color=BOT_COLOR
     )
-    # ตอบกลับทันทีเพื่อป้องกัน App Not Responding
-    await interaction.response.send_message(embed=embed)
+    # ส่งข้อความใหม่เข้า Channel (จะไม่มีแถบชื่อคนใช้คำสั่งโผล่ข้างบน Embed)
+    await interaction.channel.send(embed=embed)
+    # ลบสถานะ "Thinking" ทิ้งทันที
+    await interaction.delete_original_response()
 
 # --- 2. คำสั่ง /embed (Admin Only) ---
-@bot.tree.command(name="embed", description="สร้าง embed แบบกรอกฟิลด์ (Admin Only)")
+@bot.tree.command(name="embed", description="สร้าง embed (สีประจำบอท | Admin Only)")
 @app_commands.describe(author="ชื่อผู้เขียน", title="หัวข้อ", description="เนื้อหา", footer="ท้ายกระดาษ", image="ลิงก์รูปภาพ")
 @app_commands.checks.has_permissions(administrator=True)
 async def embed_maker(interaction: discord.Interaction, author: str=None, title: str=None, description: str=None, footer: str=None, image: str=None):
-    embed = discord.Embed(color=discord.Color.random())
+    await interaction.response.defer(ephemeral=True)
+    
+    embed = discord.Embed(color=BOT_COLOR)
     if author: embed.set_author(name=author)
     if title: embed.title = title
     if description: embed.description = description
     if footer: embed.set_footer(text=footer)
     if image: embed.set_image(url=image)
     
-    await interaction.response.send_message(embed=embed)
+    await interaction.channel.send(embed=embed)
+    await interaction.delete_original_response()
 
 # --- 3. คำสั่ง /image (Admin Only) ---
-@bot.tree.command(name="image", description="ส่งรูปภาพข่าว (Admin Only)")
+@bot.tree.command(name="image", description="ส่งรูปภาพข่าว (สีประจำบอท | Admin Only)")
 @app_commands.describe(image="เลือกไฟล์รูปภาพ")
 @app_commands.checks.has_permissions(administrator=True)
 async def image_news(interaction: discord.Interaction, image: discord.Attachment):
-    embed = discord.Embed(color=discord.Color.dark_green())
+    await interaction.response.defer(ephemeral=True)
+    
+    embed = discord.Embed(color=BOT_COLOR)
     embed.set_image(url=image.url)
     
-    await interaction.response.send_message(embed=embed)
+    await interaction.channel.send(embed=embed)
+    await interaction.delete_original_response()
 
-# --- 4. คำสั่ง /news (Admin Only | Topic จุดเดียว) ---
-@bot.tree.command(name="news", description="สร้างประกาศข่าว (Admin Only)")
-@app_commands.describe(topic="หัวข้อข่าว", date="วันที่ (กรอกเอง)", content="รายละเอียดข่าว")
+# --- 4. คำสั่ง /news (Admin Only) ---
+@bot.tree.command(name="news", description="สร้างประกาศข่าว (สีประจำบอท | Admin Only)")
+@app_commands.describe(topic="หัวข้อข่าว", date="วันที่", content="รายละเอียดข่าว")
 @app_commands.checks.has_permissions(administrator=True)
 async def news(interaction: discord.Interaction, topic: str, date: str, content: str):
+    await interaction.response.defer(ephemeral=True)
+    
     news_desc = (
         "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n"
         f"** ( Topic | หัวข้อ ) :** {topic}\n"
@@ -85,29 +100,28 @@ async def news(interaction: discord.Interaction, topic: str, date: str, content:
     embed = discord.Embed(
         title="ㅤㅤㅤㅤㅤㅤㅤ❮ THAITUNRATH News ❯", 
         description=news_desc, 
-        color=discord.Color.dark_green()
+        color=BOT_COLOR
     )
     embed.set_footer(
         text=f"ประกาศโดย {interaction.user.display_name}", 
         icon_url=interaction.user.display_avatar.url
     )
     
-    await interaction.response.send_message(embed=embed)
+    await interaction.channel.send(embed=embed)
+    await interaction.delete_original_response()
 
 # --- 5. คำสั่ง /ping (Admin Only) ---
 @bot.tree.command(name="ping", description="ประกาศเรียกทุกคน (Admin Only)")
 @app_commands.checks.has_permissions(administrator=True)
 async def ping_everyone(interaction: discord.Interaction):
-    # สำหรับการ Tag @everyone ต้องตอบกลับด้วยข้อความปกติ
-    await interaction.response.send_message(content="-# @everyone @here - sorry for ping!")
+    await interaction.response.defer(ephemeral=True)
+    
+    # ส่งข้อความ Tag ทุกคนแบบเนียนๆ
+    await interaction.channel.send("-# @everyone @here - sorry for ping!")
+    await interaction.delete_original_response()
 
 # ผูก Error Handler
 for cmd in [embed_maker, image_news, news, ping_everyone]:
     cmd.error(admin_error_handler)
 
-# รันบอท
-token = os.getenv('DISCORD_TOKEN')
-if token:
-    bot.run(token)
-else:
-    print("❌ ไม่พบ DISCORD_TOKEN ใน Variables ของ Railway!")
+bot.run(os.getenv('DISCORD_TOKEN'))
