@@ -13,7 +13,7 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Sync Slash Commands ทั้งหมดเข้า Discord
+        # Sync Slash Commands เข้า Discord
         await self.tree.sync()
         print(f"✅ บอทออนไลน์แล้วในชื่อ: {self.user}")
 
@@ -22,11 +22,17 @@ bot = MyBot()
 # --- ระบบจัดการ Error สำหรับคนไม่มีสิทธิ์ Admin ---
 async def admin_error_handler(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
-        await interaction.response.send_message("❌ **ขออภัยคั้บ!** เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ใช้คำสั่งนี้ได้", ephemeral=True)
+        # ตอบกลับแบบลับๆ ว่าไม่มีสิทธิ์
+        if not interaction.response.is_done():
+            await interaction.response.send_message("❌ **ขออภัยคั้บ!** เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ใช้คำสั่งนี้ได้", ephemeral=True)
+        else:
+            await interaction.followup.send("❌ **ขออภัยคั้บ!** เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ใช้คำสั่งนี้ได้", ephemeral=True)
 
-# --- 1. คำสั่ง /help ---
+# --- 1. คำสั่ง /help (ทุกคนใช้ได้) ---
 @bot.tree.command(name="help", description="ดูคำสั่งทั้งหมด")
 async def help_command(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    
     embed = discord.Embed(
         title="_ _",
         description=(
@@ -42,56 +48,80 @@ async def help_command(interaction: discord.Interaction):
         ),
         color=discord.Color.blue()
     )
-    await interaction.response.send_message(embed=embed)
+    await interaction.channel.send(embed=embed)
+    await interaction.delete_original_response()
 
 # --- 2. คำสั่ง /embed (Admin Only) ---
-@bot.tree.command(name="embed", description="สร้าง embed แบบกรอกฟิลด์ทีละช่อง (Admin Only)")
+@bot.tree.command(name="embed", description="สร้าง embed แบบกรอกฟิลด์ (Admin Only)")
 @app_commands.describe(author="ชื่อผู้เขียน", title="หัวข้อ", description="เนื้อหา", footer="ท้ายกระดาษ", image="ลิงก์รูปภาพ")
 @app_commands.checks.has_permissions(administrator=True)
 async def embed_maker(interaction: discord.Interaction, author: str=None, title: str=None, description: str=None, footer: str=None, image: str=None):
+    await interaction.response.defer(ephemeral=True)
+    
     embed = discord.Embed(color=discord.Color.random())
     if author: embed.set_author(name=author)
     if title: embed.title = title
     if description: embed.description = description
     if footer: embed.set_footer(text=footer)
     if image: embed.set_image(url=image)
-    await interaction.response.send_message(embed=embed)
+    
+    await interaction.channel.send(embed=embed)
+    await interaction.delete_original_response()
 
-# --- 3. คำสั่ง /image (Admin Only + สีเขียวเข้ม) ---
+# --- 3. คำสั่ง /image (Admin Only | สีเขียวเข้ม) ---
 @bot.tree.command(name="image", description="ส่งรูปภาพข่าวแบบ Embed (Admin Only)")
-@app_commands.describe(image="เลือกรูปภาพเพื่อลงข่าว")
+@app_commands.describe(image="เลือกไฟล์รูปภาพที่ต้องการส่ง")
 @app_commands.checks.has_permissions(administrator=True)
 async def image_news(interaction: discord.Interaction, image: discord.Attachment):
+    await interaction.response.defer(ephemeral=True)
+    
     embed = discord.Embed(color=discord.Color.dark_green())
     embed.set_image(url=image.url)
-    await interaction.response.send_message(embed=embed)
+    
+    await interaction.channel.send(embed=embed)
+    await interaction.delete_original_response()
 
-# --- 4. คำสั่ง /news (Admin Only + รูปแบบ THAITUNRATH) ---
+# --- 4. คำสั่ง /news (Admin Only | รูปแบบ THAITUNRATH ตามบรีฟ) ---
 @bot.tree.command(name="news", description="สร้างประกาศข่าว (Admin Only)")
-@app_commands.describe(topic="หัวข้อข่าว", content="เนื้อหาข่าว")
+@app_commands.describe(topic="หัวข้อข่าว", date="วันที่ (กรอกเอง)", content="รายละเอียดข่าว")
 @app_commands.checks.has_permissions(administrator=True)
-async def news(interaction: discord.Interaction, topic: str, content: str):
-    date_str = datetime.now().strftime("%d %B %Y")
+async def news(interaction: discord.Interaction, topic: str, date: str, content: str):
+    await interaction.response.defer(ephemeral=True)
+    
     news_desc = (
         "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n"
-        f"**({topic} | หัวข้อ)**\n"
-        f"**( Date | วันที่ ) :** {date_str}\n\n"
+        f"** ( Topic | หัวข้อ ) :** {topic}\n"
+        f"** ( Date | วันที่ ) :** {date}\n\n"
         f"{content}\n\n"
         "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
     )
-    embed = discord.Embed(title="ㅤㅤㅤㅤㅤㅤㅤ❮ THAITUNRATH News ❯", description=news_desc, color=discord.Color.dark_green())
-    embed.set_footer(text=f"ประกาศโดย {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
-    await interaction.response.send_message(embed=embed)
+    
+    embed = discord.Embed(
+        title="ㅤㅤㅤㅤㅤㅤㅤ❮ THAITUNRATH News ❯", 
+        description=news_desc, 
+        color=discord.Color.dark_green()
+    )
+    embed.set_footer(
+        text=f"ประกาศโดย {interaction.user.display_name}", 
+        icon_url=interaction.user.display_avatar.url
+    )
+    
+    await interaction.channel.send(embed=embed)
+    await interaction.delete_original_response()
 
-# --- 5. คำสั่ง /ping (Admin Only + @everyone @here) ---
+# --- 5. คำสั่ง /ping (Admin Only | Tag Everyone) ---
 @bot.tree.command(name="ping", description="ประกาศเรียกทุกคน (Admin Only)")
 @app_commands.checks.has_permissions(administrator=True)
 async def ping_everyone(interaction: discord.Interaction):
-    await interaction.response.send_message("-# @everyone @here - sorry for ping!")
+    await interaction.response.defer(ephemeral=True)
+    
+    await interaction.channel.send("-# @everyone @here - sorry for ping!")
+    await interaction.delete_original_response()
 
-# ผูก Error Handler
+# ผูก Error Handler เข้ากับคำสั่ง Admin
 for cmd in [embed_maker, image_news, news, ping_everyone]:
     cmd.error(admin_error_handler)
 
-# รันบอทผ่าน Railway Variable
-bot.run(os.getenv('DISCORD_TOKEN'))
+# รันบอท (ดึง Token จาก Railway Variables)
+token = os.getenv('DISCORD_TOKEN')
+bot.run(token)
