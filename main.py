@@ -12,6 +12,7 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
+        # Sync คำสั่งทั้งหมดให้ใช้งานได้ทันที
         await self.tree.sync()
         print(f"✅ บอทออนไลน์แล้วในชื่อ: {self.user}")
 
@@ -20,7 +21,8 @@ bot = MyBot()
 # --- ระบบจัดการ Error สำหรับ Admin ---
 async def admin_error_handler(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
-        await interaction.response.send_message("❌ **ขออภัยคั้บ!** เฉพาะ Admin เท่านั้นที่ใช้คำสั่งนี้ได้", ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.send_message("❌ **ขออภัยคั้บ!** เฉพาะ Admin เท่านั้นที่ใช้ได้", ephemeral=True)
 
 # --- 1. คำสั่ง /help ---
 @bot.tree.command(name="help", description="ดูคำสั่งทั้งหมด")
@@ -40,9 +42,8 @@ async def help_command(interaction: discord.Interaction):
         ),
         color=discord.Color.blue()
     )
-    # ส่งทันที ไม่ต้องรอลบ
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("✅ แสดงเมนูช่วยเหลือแล้ว", ephemeral=True)
+    # ตอบกลับทันทีเพื่อป้องกัน App Not Responding
+    await interaction.response.send_message(embed=embed)
 
 # --- 2. คำสั่ง /embed (Admin Only) ---
 @bot.tree.command(name="embed", description="สร้าง embed แบบกรอกฟิลด์ (Admin Only)")
@@ -56,8 +57,7 @@ async def embed_maker(interaction: discord.Interaction, author: str=None, title:
     if footer: embed.set_footer(text=footer)
     if image: embed.set_image(url=image)
     
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("✅ ส่ง Embed เรียบร้อย!", ephemeral=True)
+    await interaction.response.send_message(embed=embed)
 
 # --- 3. คำสั่ง /image (Admin Only) ---
 @bot.tree.command(name="image", description="ส่งรูปภาพข่าว (Admin Only)")
@@ -67,8 +67,7 @@ async def image_news(interaction: discord.Interaction, image: discord.Attachment
     embed = discord.Embed(color=discord.Color.dark_green())
     embed.set_image(url=image.url)
     
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("✅ ลงรูปภาพเรียบร้อย!", ephemeral=True)
+    await interaction.response.send_message(embed=embed)
 
 # --- 4. คำสั่ง /news (Admin Only | Topic จุดเดียว) ---
 @bot.tree.command(name="news", description="สร้างประกาศข่าว (Admin Only)")
@@ -93,18 +92,22 @@ async def news(interaction: discord.Interaction, topic: str, date: str, content:
         icon_url=interaction.user.display_avatar.url
     )
     
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("✅ ประกาศข่าวเรียบร้อย!", ephemeral=True)
+    await interaction.response.send_message(embed=embed)
 
 # --- 5. คำสั่ง /ping (Admin Only) ---
 @bot.tree.command(name="ping", description="ประกาศเรียกทุกคน (Admin Only)")
 @app_commands.checks.has_permissions(administrator=True)
 async def ping_everyone(interaction: discord.Interaction):
-    await interaction.channel.send("-# @everyone @here - sorry for ping!")
-    await interaction.response.send_message("✅ Tag ทุกคนเรียบร้อย!", ephemeral=True)
+    # สำหรับการ Tag @everyone ต้องตอบกลับด้วยข้อความปกติ
+    await interaction.response.send_message(content="-# @everyone @here - sorry for ping!")
 
 # ผูก Error Handler
 for cmd in [embed_maker, image_news, news, ping_everyone]:
     cmd.error(admin_error_handler)
 
-bot.run(os.getenv('DISCORD_TOKEN'))
+# รันบอท
+token = os.getenv('DISCORD_TOKEN')
+if token:
+    bot.run(token)
+else:
+    print("❌ ไม่พบ DISCORD_TOKEN ใน Variables ของ Railway!")
