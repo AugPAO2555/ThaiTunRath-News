@@ -3,21 +3,23 @@ from discord import app_commands
 from discord.ext import commands
 import os
 
-# ตั้งค่าพื้นฐาน
+# 1. ตั้งค่าพื้นฐาน
 intents = discord.Intents.default()
-intents.message_content = True
+# สำหรับ Slash Command ไม่จำเป็นต้องเปิด Message Content ก็ได้ครับ แต่เปิดไว้เผื่ออนาคตก็ดี
+intents.message_content = True 
 
 class MyBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
+        # Sync คำสั่งเข้า Discord ทันทีที่รัน
         await self.tree.sync()
-        print(f"✅ บอทออนไลน์แล้วในชื่อ: {self.user}")
+        print(f"✅ บอท Slash Command ออนไลน์แล้ว: {self.user}")
 
 bot = MyBot()
 
-# สีประจำบอท (เขียวเข้มเดียวกับ News)
+# สีประจำบอท (เขียวเข้ม)
 BOT_COLOR = discord.Color.dark_green()
 
 # --- ระบบจัดการ Error สำหรับ Admin ---
@@ -29,9 +31,6 @@ async def admin_error_handler(interaction: discord.Interaction, error: app_comma
 # --- 1. คำสั่ง /help ---
 @bot.tree.command(name="help", description="ดูคำสั่งทั้งหมด")
 async def help_command(interaction: discord.Interaction):
-    # Defer แบบเงียบ (เห็นแค่คนกด) เพื่อปิดช่องโหว่เรื่องแถบชื่อ
-    await interaction.response.defer(ephemeral=True)
-    
     embed = discord.Embed(
         title="_ _",
         description=(
@@ -41,24 +40,19 @@ async def help_command(interaction: discord.Interaction):
             "* เริ่มที่คำสั่งหลักกันคั้บ !!\n"
             "- -# คำสั่ง - รายละเอียด\n\n"
             "**• /embed** - สร้างข้อความแบบ Embed\n"
-            "**• /image** - ลงภาพข่าว (สีประจำบอท)\n"
+            "**• /image** - ลงภาพข่าว (สีเขียวเข้ม)\n"
             "**• /news** - สร้างข่าวรูปแบบ THAITUNRATH\n"
             "**• /ping** - ประกาศแจ้งเตือนทุกคน"
         ),
         color=BOT_COLOR
     )
-    # ส่งข้อความใหม่เข้า Channel (จะไม่มีแถบชื่อคนใช้คำสั่งโผล่ข้างบน Embed)
-    await interaction.channel.send(embed=embed)
-    # ลบสถานะ "Thinking" ทิ้งทันที
-    await interaction.delete_original_response()
+    await interaction.response.send_message(embed=embed)
 
 # --- 2. คำสั่ง /embed (Admin Only) ---
-@bot.tree.command(name="embed", description="สร้าง embed (สีประจำบอท | Admin Only)")
+@bot.tree.command(name="embed", description="สร้าง embed แบบกรอกฟิลด์ (Admin Only)")
 @app_commands.describe(author="ชื่อผู้เขียน", title="หัวข้อ", description="เนื้อหา", footer="ท้ายกระดาษ", image="ลิงก์รูปภาพ")
 @app_commands.checks.has_permissions(administrator=True)
 async def embed_maker(interaction: discord.Interaction, author: str=None, title: str=None, description: str=None, footer: str=None, image: str=None):
-    await interaction.response.defer(ephemeral=True)
-    
     embed = discord.Embed(color=BOT_COLOR)
     if author: embed.set_author(name=author)
     if title: embed.title = title
@@ -66,29 +60,22 @@ async def embed_maker(interaction: discord.Interaction, author: str=None, title:
     if footer: embed.set_footer(text=footer)
     if image: embed.set_image(url=image)
     
-    await interaction.channel.send(embed=embed)
-    await interaction.delete_original_response()
+    await interaction.response.send_message(embed=embed)
 
 # --- 3. คำสั่ง /image (Admin Only) ---
-@bot.tree.command(name="image", description="ส่งรูปภาพข่าว (สีประจำบอท | Admin Only)")
+@bot.tree.command(name="image", description="ส่งรูปภาพข่าว (Admin Only)")
 @app_commands.describe(image="เลือกไฟล์รูปภาพ")
 @app_commands.checks.has_permissions(administrator=True)
 async def image_news(interaction: discord.Interaction, image: discord.Attachment):
-    await interaction.response.defer(ephemeral=True)
-    
     embed = discord.Embed(color=BOT_COLOR)
     embed.set_image(url=image.url)
-    
-    await interaction.channel.send(embed=embed)
-    await interaction.delete_original_response()
+    await interaction.response.send_message(embed=embed)
 
 # --- 4. คำสั่ง /news (Admin Only) ---
-@bot.tree.command(name="news", description="สร้างประกาศข่าว (สีประจำบอท | Admin Only)")
-@app_commands.describe(topic="หัวข้อข่าว", date="วันที่", content="รายละเอียดข่าว")
+@bot.tree.command(name="news", description="สร้างประกาศข่าว (Admin Only)")
+@app_commands.describe(topic="หัวข้อข่าว", date="วันที่ (กรอกเอง)", content="รายละเอียดข่าว")
 @app_commands.checks.has_permissions(administrator=True)
 async def news(interaction: discord.Interaction, topic: str, date: str, content: str):
-    await interaction.response.defer(ephemeral=True)
-    
     news_desc = (
         "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n"
         f"** ( Topic | หัวข้อ ) :** {topic}\n"
@@ -102,23 +89,15 @@ async def news(interaction: discord.Interaction, topic: str, date: str, content:
         description=news_desc, 
         color=BOT_COLOR
     )
-    embed.set_footer(
-        text=f"ประกาศโดย {interaction.user.display_name}", 
-        icon_url=interaction.user.display_avatar.url
-    )
+    embed.set_footer(text=f"ประกาศโดย {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
     
-    await interaction.channel.send(embed=embed)
-    await interaction.delete_original_response()
+    await interaction.response.send_message(embed=embed)
 
 # --- 5. คำสั่ง /ping (Admin Only) ---
 @bot.tree.command(name="ping", description="ประกาศเรียกทุกคน (Admin Only)")
 @app_commands.checks.has_permissions(administrator=True)
 async def ping_everyone(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    
-    # ส่งข้อความ Tag ทุกคนแบบเนียนๆ
-    await interaction.channel.send("-# @everyone @here - sorry for ping!")
-    await interaction.delete_original_response()
+    await interaction.response.send_message(content="-# @everyone @here - sorry for ping!")
 
 # ผูก Error Handler
 for cmd in [embed_maker, image_news, news, ping_everyone]:
